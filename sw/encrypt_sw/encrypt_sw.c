@@ -7,9 +7,16 @@
 #include <unistd.h>
 #include <openssl/evp.h>
 
+#define ERR_BAD_OPTIONS 0
+#define ERR_FILE_NOT_FOUND 1
+#define HELP_MSSG 2
+#define ERR_BAD_ENCRYPT 3
+
 int arg_parse_client(int argc, char **argv, char **filename);
-int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key, unsigned char *iv, unsigned char *ciphertext);
-int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key, unsigned char *iv, unsigned char *plaintext);
+int encrypt(unsigned char *plaintext, int plaintext_len, 
+    unsigned char *key, unsigned char *iv, unsigned char *ciphertext);
+int decrypt(unsigned char *ciphertext, int ciphertext_len, 
+    unsigned char *key, unsigned char *iv, unsigned char *plaintext);
 
 int main(int argc, char *argv[]){
     // Check for user args
@@ -19,6 +26,7 @@ int main(int argc, char *argv[]){
 
     // Parse user args using getopt
     char *filename = NULL;
+    arg_parse_client(argc, argv, &filename);
 
     unsigned char *plaintext = NULL;
 
@@ -32,12 +40,12 @@ int main(int argc, char *argv[]){
     long file_size = ftell(fptr);
     fseek(fptr, 0, SEEK_SET);
 
-    char *plaintext = malloc(file_size + 1);
+    plaintext = malloc(file_size + 1);
     fread(plaintext, 1, file_size, fptr);
     plaintext[file_size] = '\0';
 
-    //TODO: retrieve key and convert to char*
-    // hardcoded testing key.
+
+    // DEBUG: hardcoded testing key-- put actual keys here using driver
     // TODO: need a bit of a delay so you get diffy trngs on read
     uint64_t REG0_1 = 0x12345678;
     uint64_t REG1_1 = 0x9abcdef0;
@@ -46,34 +54,44 @@ int main(int argc, char *argv[]){
 
     unsigned char key[16];
     unsigned char iv[16];
-    // TODO: for actual memory figure out big endian-ness
+
+    // TODO: for actual memory here figure out big endian-ness
     memcpy(key, &REG0_1, 8);     
     memcpy(key + 8, &REG1_1, 8);
     memcpy(iv, &REG0_2, 8);
     memcpy(iv + 8, &REG1_2, 8);
 
-    unsigned char* ciphertext;
-    unsigned char* decyrptedtext;
-    int ciphertext_len, decyptedtext_len;
+    // Allocate ciphertext and decypted text, accounting for padding
+    unsigned char* ciphertext = malloc(file_size + 16);
+    unsigned char* decryptedtext = malloc(file_size + 16);
+    int ciphertext_len, decryptedtext_len;
 
     // Encrypt the plaintext
-    ciphertext_len = encrypt(plaintext, strlen(plaintext), (unsigned char*) HARDCODED_KEY, (unsigned char*) HARDCODED_IV, ciphertext);
+    ciphertext_len = encrypt(plaintext, strlen(plaintext), 
+        (unsigned char*) key, (unsigned char*) iv, ciphertext);
 
     // TODO: Save IV, KEY, and Cyphertext to output files.
     
-    // DEBUG: Show the ecrypted text
+
+    // Show the ecrypted text
     printf("Encrypted text is:\n");
     printf("%s\n", ciphertext);
 
     // Decrypt the ciphertext
-    decryptedtext_len = decrypt(ciphertext, ciphertext_len, (unsigned char*) HARDCODED_KEY, (unsigned char*) HARDCODED_IV, decryptedtext);
-
-    // Add a NULL terminator.
+    decryptedtext_len = decrypt(ciphertext, ciphertext_len, 
+        (unsigned char*) key, (unsigned char*) iv, decryptedtext);
+ 
+    // Display decrypted text
     decryptedtext[decryptedtext_len] = '\0';
 
-    // Show the decrypted text
     printf("Decrypted text is:\n");
     printf("%s\n", decryptedtext);
+
+    // Free memory
+    free(plaintext);
+    free(ciphertext);
+    free(decryptedtext);
+    free(filename);
 
     return 0;
 
@@ -93,26 +111,31 @@ int main(int argc, char *argv[]){
  *
  * Return: 0
  */
-int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key, unsigned char *iv, unsigned char *ciphertext){
+int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key, 
+    unsigned char *iv, unsigned char *ciphertext){
     
     EVP_CIPHER_CTX *ctx;
     int len = 0;
     int ciphertext_len = 0;
 
-    /* Create and initialise the context */
-    if(!(ctx = EVP_CIPHER_CTX_new()))
+    // Create and initialise the context
+    if(!(ctx = EVP_CIPHER_CTX_new())){
         handleErrors();
+    }
 
     // Initialise the encryption operation.
-    if(1 != EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, iv))
-        handleErrors();
+    if(1 != EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, iv)){
+        print_errs(ERR_BAD_ENCRYPT);
+    }
 
     // TODO: loop to dynamically encrypt full text...
-    if(1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len))
-        handleErrors();
+    if(1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len)){
+        print_errs(ERR_BAD_ENCRYPT);
+    }
     ciphertext_len = len;
-    if(1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len))
-        handleErrors();
+    if(1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len)){
+        print_errs(ERR_BAD_ENCRYPT);
+    }
     ciphertext_len += len;
 
     // Clean up
@@ -135,7 +158,8 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key, uns
  *
  * Return: 0
  */
-int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key, unsigned char *iv, unsigned char *plaintext){
+int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key, 
+    unsigned char *iv, unsigned char *plaintext){
     
     EVP_CIPHER_CTX *ctx;
 
@@ -144,21 +168,21 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key, u
 
     // Create and initialise the context
     if(!(ctx = EVP_CIPHER_CTX_new())){
-        handleErrors();
+        print_errs(ERR_BAD_ENCRYPT);
     }
 
     // Initialise the decryption operation.
     if(1 != EVP_DecryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, iv)){
-        handleErrors();
+        print_errs(ERR_BAD_ENCRYPT);
     }
 
     // TODO: loop to dynamically encrypt full text
     if(1 != EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len)){
-        handleErrors();
+        print_errs(ERR_BAD_ENCRYPT);
     }
     plaintext_len = len;
     if(1 != EVP_DecryptFinal_ex(ctx, plaintext + len, &len)){
-        handleErrors();
+        print_errs(ERR_BAD_ENCRYPT);
     }
     plaintext_len += len;
 
@@ -205,4 +229,37 @@ int arg_parse_client(int argc, char **argv, char **filename){
     }
 
     return 0;
+}
+
+/**
+ * print_errs() - Print error and help of function
+ * @errtype: Flag for specific errors
+ *
+ * Called when errors occur. Will print
+ * applicable error message or help/usage prompt.
+ *
+ * Return: void
+ */
+void print_errs(int errtype){
+    if(errtype == ERR_BAD_OPTIONS){
+        printf("ERROR: Incorrect options.\n");
+    }else if (errtype == ERR_FILE_NOT_FOUND){
+        printf("ERROR: File not found.\n");
+    }else if (errtype == ERR_BAD_ENCRYPT){
+        printf("ERROR: Encryption/decryption process failed. Please try again.\n");
+    }
+
+    if(errtype == ERR_BAD_OPTIONS || errtype == HELP_MSSG)(
+        printf(
+            "Usage:\n"
+            "  ./encrypt [-f FILE]\n\n"
+            "Description:\n"
+            "  Takes file and uses a random key and iv to encrypt the file in AES-128. Outputs the key, iv, and encrypted data into separate files.\n\n"
+            "Arguments:\n"
+            "  -h                    show this help message and exit\n"
+            "  -f FILE               specify a text file\n\n"
+        );
+    );
+
+    exit(0);
 }
