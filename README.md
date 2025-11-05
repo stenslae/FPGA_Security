@@ -1,6 +1,6 @@
 # FPGA Security
 
-This repository holds a configurable system for the DE10-Nano to explore trust, cryptography, and hardware/IoT hacking on FPGAs.
+This repository holds a configurable system for the DE10-Nano to explore trust, cryptography, and exploitations on FPGAs.
 
 # Projects
 

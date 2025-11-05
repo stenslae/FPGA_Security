@@ -10,6 +10,13 @@ A system was implemented on a DE10-Nano to generate true random numbers on a 32 
 
 ## Randomness Testing
 
+### Getting Samples for Testing
+
+### Fuzzing Program
+- Shannon entropy/autocorrelation/distribution
+
+### NIST STS Test
+
 ## Software Applications
 
 ### Encrypting/decrypting files in the userspace
