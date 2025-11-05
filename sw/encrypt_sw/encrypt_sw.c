@@ -77,17 +77,21 @@ int main(int argc, char *argv[]){
 
     
     // Save ciphertext,iv, and key to output bin
-    fptr = fopen("output/key.bin", "wb");
+    fptr = fopen("output/key.hex", "wb");
     if(fptr==NULL){
         print_errs(ERR_FILE_NOT_FOUND);
     }
-    fprintf(fptr, (char*)key);
+    for(int i = 0; i < 16; i++){
+        fprintf(fptr, "%02x", key[i]);
+    }
     fclose(fptr);  
-    fptr = fopen("output/iv.bin", "wb");
+    fptr = fopen("output/iv.hex", "wb");
     if(fptr==NULL){
         print_errs(ERR_FILE_NOT_FOUND);
     }
-    fprintf(fptr, (char*)iv);
+    for(int i = 0; i < 16; i++){
+        fprintf(fptr, "%02x", iv[i]);
+    }
     fclose(fptr);
     fptr = fopen("output/ciphertext.bin", "wb");
     if(fptr==NULL){
