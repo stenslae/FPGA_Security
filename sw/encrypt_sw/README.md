@@ -13,6 +13,9 @@ Takes file and uses a random key to encrypt the file in AES-128. Outputs the key
 - `-h`  
   Show this help message and exit.
 
+- `-v`
+  Print the IV, key, and ciphertext.
+
 - `-f FILE`  
   Specify a text file with any content.
 
@@ -44,8 +47,8 @@ cp encrypt /srv/nfs/de10nano/nfs-kernel-server/home/soc/
 
 4. In the SoC's ARM CPU, follow the [Usage Guide](#usage) to run!
 
-5. To test the encryption, take the `ciphertext.bin`, `key.hex`, and `iv.hex` outputs and run the following:
+5. To test the encryption, take the `ciphertext.bin`, `key.hex`, and `iv.hex` outputs and run the following.
 
 ```bash
-openssl enc -aes-128-cbc -e -in ciphertext.bin -out decrypt.txt -K $(cat key.hex) -iv $(cat iv.hex) -p
+openssl enc -aes-128-cbc -d -in ciphertext.bin -out decrypt.txt -K $(cat key.hex) -iv $(cat iv.hex) -p
 ```

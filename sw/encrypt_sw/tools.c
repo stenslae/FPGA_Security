@@ -31,12 +31,22 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
     if(1 != EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, iv)){
         print_errs(ERR_BAD_ENCRYPT);
     }
+    EVP_CIPHER_CTX_set_padding(ctx, 1);
 
-    // TODO: loop to dynamically encrypt full text...
-    if(1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len)){
-        print_errs(ERR_BAD_ENCRYPT);
+    // TODO: DEBUG - Loop in chunks to encrypt full text
+    int chunk_size = 1024;
+    int offset = 0;
+    while (offset < plaintext_len) {
+        // If
+        int to_encrypt = (plaintext_len - offset > chunk_size) ? chunk_size : (plaintext_len - offset);
+        if (1 != EVP_EncryptUpdate(ctx, ciphertext + ciphertext_len, &len, plaintext + offset, to_encrypt)){
+            print_errs(ERR_BAD_ENCRYPT);
+        }
+        ciphertext_len += len;
+        offset += to_encrypt;
     }
-    ciphertext_len = len;
+
+    // Add the final part
     if(1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len)){
         print_errs(ERR_BAD_ENCRYPT);
     }
@@ -108,11 +118,14 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
  * Return: 0
  */
 int arg_parse_client(int argc, char **argv, char **filename){
-    int opt;
+    int opt, v;
     while ((opt = getopt(argc, argv, ":p:f:hv")) != -1){
         switch (opt){
         case 'f':
             *filename = strdup(optarg);
+            break;
+        case 'v':
+            v = 1;
             break;
         case 'h':
             print_errs(HELP_MSSG);
@@ -132,7 +145,11 @@ int arg_parse_client(int argc, char **argv, char **filename){
         }
     }
 
-    return 0;
+    if(*filename==NULL){
+        print_errs(ERR_BAD_OPT);
+    }
+
+    return v;
 }
 
 /**
@@ -161,6 +178,7 @@ void print_errs(int errtype){
             "  Takes file and uses a random key and iv to encrypt the file in AES-128. Outputs the key, iv, and encrypted data into separate files.\n\n"
             "Arguments:\n"
             "  -h                    show this help message and exit\n"
+            "  -v                    print the iv, key, ciphertext, and decrypted text.\n"
             "  -f FILE               specify a text file\n\n"
         );
     };
