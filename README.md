@@ -34,4 +34,5 @@ The system provides the necessary framework for building, testing, and experimen
 
 ## 💡 Acknowledgements
 
-- Repository template provided by Trevor Vannoy of MSU Bozeman for the purposes of **EELE 467**.\
+- Repository template provided by Trevor Vannoy of MSU Bozeman for the purposes of **EELE 467**.
+
