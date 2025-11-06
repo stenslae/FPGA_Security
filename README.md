@@ -10,8 +10,6 @@ The system provides the necessary framework for building, testing, and experimen
 
 ## 🧠 System Overview
 
-## 🧠 System Overview
-
 - **Platform:** DE10-Nano FPGA (Cyclone V SoC)
 - **Communication:** HPS-FPGA interface, NFS and TFTP Servers over Ethernet  
 - **Development Tools:** Quartus Prime, OpenSSL, Linux for HPS  
@@ -38,3 +36,4 @@ The system provides the necessary framework for building, testing, and experimen
 
 - Repository template provided by Trevor Vannoy of MSU Bozeman for the purposes of **EELE 467**.
 - 
+
