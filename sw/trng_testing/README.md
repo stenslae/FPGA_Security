@@ -10,10 +10,10 @@ The TRNG output is temporarily routed to a GPIO pin, and a LabJack T7-Pro is is 
 2. Wire FIO0 to GPIO_0(12) on the DE-10 Nano.
 3. Ensure the DE-10 Nano is programmed with the TRNG.
 3. In a python environment, run `python lj_data.py`.
-4. Once ready (~2 hrs), a file `trng_data.bin` will be generated with 50M bits of data.
+4. Once ready, a file `trng_data.bin` will be generated with 50M bits of data.
 6. Use the NIST 800-22 STS to verify randomness.
 
-![Testing Connections](../../../docs/assets/testing_connections.jpg)
+![Testing Connections](../../docs/assets/testing_connections.jpg)
 
 ## Pinouts
 
