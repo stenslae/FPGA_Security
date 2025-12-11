@@ -20,3 +20,8 @@ Fun ideas that use the TRNG.
 1. Compare ECDSA effectiveness with good TRNG vs broken TRNG as the nonce (& just learn more about EC).
 2. Active TRNG effectiveness monitor.
 3. Recreate NSA Dual_EC Backdoor.
+
+## Misc:
+
+1. TRNG Threat Model (Good practice)
+2. Spectre & Meltdown Case Studies (not exacly related to the TRNG but still relevant i swear)
