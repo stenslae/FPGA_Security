@@ -5,27 +5,22 @@
 1. [Introduction](#introduction)
 
    - [Project Goals](#project-goals)
-
    - [Background](#background)
 
 2. [System Architecture](#system-architecture)
 
    - [VHDL Structure](#vhdl-structure)
-
    - [Ring Oscillators and MUROs](#ring-oscillators-and-muros)
 
 3. [Randomness Testing](#randomness-testing)
 
    - [Test Suite Overview](#test-suite-overview)
-
    - [Results Summary](#results-summary)
 
 4. [Takeaways](#takeaways)
 
    - [Entropy is Fragile](#entropy-is-fragile)
-
    - [You Can Be Broke and Have a TRNG](#you-can-be-broke-and-have-a-trng)
-
    - [Future Ideas](#future-ideas)
 
 5. [References](#references)
@@ -34,23 +29,21 @@
 
 ### Project Goals
 
-- Software PRNGs are cool, but analog noise is cooler. With this project, a true random number generator (TRNG) was implemented on an SoC FPGA. The randomness quality was evaluated using NIST SP 800-22 and NIST SP 800-90B standards.
+- Software PRNGs are cool, but **analog noise is cooler.** With this project, a **true random number generator (TRNG)** was implemented on an SoC FPGA. The randomness quality was evaluated using **NIST SP 800-22** and **NIST SP 800-90B** standards.
 
 ### Background
 
-- A System on Chip (SoC) Field-Programmable Gate Array (FPGA) is an integrated circuit (IC) that combines a Hard Processing System, a dedicated CPU, with FPGA Fabric, which can be reconfigured at the hardware level after manufacturing.
+- A **System on Chip (SoC) Field-Programmable Gate Array (FPGA)** is an integrated circuit (IC) that combines a **Hard Processing System**, a dedicated CPU, with **FPGA Fabric**, which can be reconfigured at the hardware level after manufacturing.
 
-- True Random Number Generators (TRNGs) derive randomness from physical processes (entropy), while PRNGs are deterministic and use mathematical algorithms. TRNGs are essential in cryptography because predictable numbers can compromise security.
+- **True Random Number Generators (TRNGs)** derive randomness from physical processes (entropy), while PRNGs are deterministic and use mathematical algorithms. TRNGs are essential in cryptography because predictable numbers can compromise security.
 
-- This system's primary entropy source is ring oscillators, which exploit thermal noise and jitter in electronics for unpredictable bit generation.
+- This system's primary entropy source is **ring oscillators**, which exploit **thermal noise and jitter in electronics** for unpredictable bit generation.
 
-- These generated bits often contain bias or correlation, so post-processing ensures uniform randomness. The following conditioning was implemented:
+- These generated bits often contain **bias or correlation**, so post-processing ensures uniform randomness. The following conditioning was implemented:
+   - **Von-Neumann correction** removes bias by discarding consecutive identical bits.
+   - **LFSR-based whitening** spreads entropy across the output bits by using linear feedback, reducing correlations.
 
-   - Von-Neumann correction removes bias by discarding consecutive identical bits.
-
-   - LFSR-based whitening spreads entropy across the output bits by using linear feedback, reducing correlations.
-
-> A famous TRNG is [Cloudflare's Lavarand](https://en.wikipedia.org/wiki/Lavarand), which sources entropy from pixel imaging of a wall of lava lamps! Fun fact- It uses SHA-1 Hashing for post-processing, which prevents reversibility of the entropy patterns (since hashing is computationally infeasible to reverse).
+> A famous TRNG is **[Cloudflare's Lavarand](https://en.wikipedia.org/wiki/Lavarand)**, which sources entropy from pixel imaging of a wall of lava lamps! Fun fact- It uses SHA-1 Hashing for post-processing, which prevents reversibility of the entropy patterns (since hashing is computationally infeasible to reverse).
 
 ## System Architecture
 
@@ -58,37 +51,30 @@
 
 ![Circuit Diagram](assets/trng_circuit_diagram.png)
 
-- trng_avalon.vhd - HPS-to-Fabric interface to expose 32-bit read-only register.
-
+- `trng_avalon.vhd` - HPS-to-Fabric interface to expose 32-bit read-only register.
 - trng.vhd - Is the core logic. It generates the TRNG bitstream by:
-
     1. Collects outputs from four MUROs.
-
     2. Applies Von-Neumann correction to reduce bias.
+    3. Puts the bit into a 32-bit Linear Feedback Shift Register (LFSR) with the seed polynomial `x^32 + x^22 + x^17 + x^16 + 1` to spread entropy and reduce correlations.
+- `muro.vhd` - Multi-Ring Oscillator (MURO) module structure.
+  - `ring_oscillator_async.vhd` - Provides asynchronous clock signals derived from individual ring oscillators.
+  - `ring_oscillator.vhd` - Generates jittered oscillations to be sampled with D flip-flops triggered by the oscillator-derived clock.
 
-    3. Puts the bit into a 32-bit Linear Feedback Shift Register (LFSR) with the seed polynomial x^32 + x^22 + x^17 + x^16 + 1 to spread entropy and reduce correlations.
-
-- muro.vhd - Multi-Ring Oscillator (MURO) module structure.
-
-  - ring_oscillator_async.vhd - Provides asynchronous clock signals derived from individual ring oscillators.
-
-  - ring_oscillator.vhd - Generates jittered oscillations to be sampled with D flip-flops triggered by the oscillator-derived clock.
-
-This hierarchical design separates concerns: muro.vhd handles entropy collection, trng.vhd manages bit conditioning, and trng_avalon.vhd interfaces with the CPU.
+This hierarchical design separates concerns: `muro.vhd` handles entropy collection, `trng.vhd` manages bit conditioning, and `trng_avalon.vhd` interfaces with the CPU.
 
 ### Ring Oscillators and MUROs
 
 ![Ring Oscillator Diagram](assets/muro_circuit_diagram.png)
 
-- Seven Ring Oscillators, each with seven inverters, were XORed together to serve as the primary entropy source.
+- **Seven Ring Oscillators**, each with seven inverters, were XORed together to serve as the primary entropy source.
 
-- A MURO samples seven oscillators with a divided oscillator-derived clock. 
+- A **MURO** samples seven oscillators with a divided oscillator-derived clock. 
 
-- Theory of Operation: Ring oscillators are ideally perfect "clocks." But, due to physical variations and analog noise, each ring oscillator has a slight timing jitter. When multiple ring oscillators are simultaneously sampled after a few clock cycles, they will be slightly offset due to accumulated jitter.
+- **Theory of Operation**: Ring oscillators are ideally perfect "clocks." But, due to physical variations and analog noise, each ring oscillator has a slight timing jitter. When multiple ring oscillators are simultaneously sampled after a few clock cycles, they will be slightly offset due to accumulated jitter.
 
 ![Image Provided by OpenTRNG.com](assets/muro_timing_diagram.png)
 
-- Design Considerations: RO proximity induces correlations because nearby ROs experience similar noise. Quartus Lite was used as the compiler and does not allow floorplanning, so the following choices were made to optimize entropy:
+- **Design Considerations**: RO proximity induces correlations because nearby ROs experience similar noise. Quartus Lite was used as the compiler and does not allow floorplanning, so the following choices were made to optimize entropy:
 
    - A larger clock divider slows the throughput but allows jitter to accumulate more fully.
 
@@ -102,11 +88,11 @@ This hierarchical design separates concerns: muro.vhd handles entropy collection
 
 - [Full Testing Procedure](../sw/testing)
 
-- The TRNG output was temporarily routed onto one of the FPGA's GPIO pins during development. From there a Labjack T7-Pro was used to sample the GPIO pin and saved into a file for randomness testing. This method increased development time, as the full SoC system did not need to be compiled; instead, just the fabric was and directly interfaced with. A sampling rate of 3.3 kHz was used, and 70 Mbits were collected over the span of 6 hours, providing a statistically significant dataset for verification that occurred over thermal drift in regular operation.
+- The TRNG output was temporarily routed onto one of the FPGA's GPIO pins during development. From there a **Labjack T7-Pro** was used to sample the GPIO pin and saved into a file for randomness testing. This method increased development time, as the full SoC system did not need to be compiled; instead, just the fabric was and directly interfaced with. A sampling rate of 3.3 kHz was used, and 70 Mbits were collected over the span of 6 hours, providing a statistically significant dataset for verification that occurred over thermal drift in regular operation.
 
-- NIST SP 800-22 statistical test suite (V2.1.2) was the primary test for validation. It validates several aspects of randomness, including the frequency of 1 and 0 bits being equal, and checks for correlation, repeatability, and the level of unpredictability. 
+- **NIST SP 800-22** statistical test suite (V2.1.2) was the primary test for validation. It validates several aspects of randomness, including the frequency of 1 and 0 bits being equal, and checks for correlation, repeatability, and the level of unpredictability. 
 
-- Additionally, the NIST SP 800-90B statistical test suite was used to verify the entropy source and conditioning quality, not from the overall bitstream but from the source itself. So, it's pretty much the SP 800-22, but with different math.
+- Additionally, the **NIST SP 800-90B** statistical test suite was used to verify the entropy source and conditioning quality, not from the overall bitstream but from the source itself. So, it's pretty much the SP 800-22, but with different math.
 
 > Essentially, the NIST's Statistical Test Suites will break your heart if it's not statistically random according to federal standards.
 
@@ -141,16 +127,12 @@ The FPGA True Random Number Generator is statistically random according to NIST 
 The FPGA True Random Number Generator provides a near-ideal entropy source according to the NIST SP 800-90B criteria.
 
 - Min-Entropy Estimate:
-
-   - h': 0.998100 (Best Score 1)
+   - **h':** 0.998100 (Best Score 1)
 
 - Bias Estimates:
-
-   - Mean: 127.632 (Best Score: 128)
-
-   - Mode: 128 (Best Score: 128)
-
-   - P-Hat: 0.50048968528854731 (Best Score: 0.5)
+   - **Mean:** 127.632 (Best Score: 128)
+   - **Mode:** 128 (Best Score: 128)
+   - **P-Hat:** 0.50048968528854731 (Best Score: 0.5)
 
 - Chi-Square, Longest Repeated Substring, and Permutation Tests Passed.
 
@@ -160,13 +142,13 @@ This project was extremely insightful in refining VHDL scripting and debugging t
 
 ### Entropy is Fragile
 
-By actively conducting and failing NIST tests during the TRNG development, an effective understanding of entropy sources and statistical randomness was developed. From too-slow clock dividers to insufficient conditioning, understanding how changes within the FPGA system totally altered the statistical results showed how fragile the concept of randomness is when applied incorrectly. 
+By actively conducting and failing NIST tests during the TRNG development, an effective understanding of entropy sources and statistical randomness was developed. From too-slow clock dividers to insufficient conditioning, understanding how changes within the FPGA system totally altered the statistical results showed how **fragile the concept of randomness is when applied incorrectly**. 
 
-Primarily, conditioning vastly improved the level of randomness within this system by reducing correlation and spreading out entropy, but conditioning meant nothing on bad entropy sources.
+Primarily, conditioning vastly improved the level of randomness within this system by reducing correlation and spreading out entropy, but **conditioning meant nothing on bad entropy sources**.
 
 ### You Can Be Broke and Have a TRNG
 
-An unexpected takeaway from this project was due to hardware limitation. It was determined that statistically strong TRNGs are still possible to develop when only low-cost equipment is available. Despite being stuck sampling my TRNG at a breakneck speed of 3.3 kHz overnight, I was able to test an environment of natural thermal drift that the TRNG should be expected to experience if it were to be used in real-world applications.
+An unexpected takeaway from this project was due to hardware limitation. It was determined that **statistically strong TRNGs are still possible to develop when only low-cost equipment is available**. Despite being stuck sampling my TRNG at a breakneck speed of 3.3 kHz overnight, I was able to test an environment of natural thermal drift that the TRNG should be expected to experience if it were to be used in real-world applications.
 
 And, most significantly, by using Quartus Lite, I found out ring-oscillator-based TRNGs can work without floorplanning. Statistically strong entropy was still produced without ideal placement of entropy sources, as long as the correct countermeasures are implemented. By adding spatial diversity with more MUROs and increasing jitter accumulation with a slower divider, statistical randomness was achieved despite this limitation. Take that, well-funded hardware security labs.
 
@@ -177,15 +159,9 @@ Lastly, this system provides a great sandbox for potential exploits, because why
 ## References
 
 - Kubíček, Jiří. "Data Whitening Used in RF." Kubicek Blog, 2024.
-
 - Le, Jin, et al. "An efficient and stable composed entropy extraction method for FPGA-based RO PUF." IEICE Electronics Express, 2020.
-
-- NIST 800-22 Statistical Test Suite.
-
+- NIST 800-22 & NIST 800-90B Statistical Test Suite.
 - OpenTRNG.com
-
-- Sklavos, Nicolas, et al. Hardware Security and Trust. Springer, 2017.
-
+- Sklavos, Nicolas, et al. *Hardware Security and Trust.* Springer, 2017.
 - Torii, Naoya, et al. "Implementation and Evaluation of Ring Oscillator-based True Random Number Generator." SOKA University, 2022.
-
 - Varchola, Michal, and Milos Drutarovsky. "New High Entropy Element for FPGA Based True Random Number Generators." Technical University of Kosice, 2010.
